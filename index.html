@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#050b16" />
+  <title>SPIDER SYSTEM 0.5</title>
+  <style>
+    :root {
+      --blue: #39c9ff;
+      --blue-soft: rgba(57, 201, 255, .18);
+      --red: #ff465d;
+      --bg: #050b16;
+      --panel: rgba(4, 17, 31, .88);
+      --line: rgba(57, 201, 255, .58);
+      --text: #e8f8ff;
+      --muted: #83a9bc;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; width: 100%; min-height: 100%; background: var(--bg); color: var(--text); font-family: system-ui, Arial, sans-serif; }
+    body { min-height: 100svh; overflow-x: hidden; }
+    button, a { font: inherit; }
+    .app { width: 100%; min-height: 100svh; display: flex; flex-direction: column; padding: max(10px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom)); gap: 10px; }
+    .topbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .brand { font-size: 13px; font-weight: 800; letter-spacing: .2em; color: var(--blue); }
+    .version { color: var(--muted); font-size: 10px; letter-spacing: .12em; }
+    .clock { font-variant-numeric: tabular-nums; font-size: 20px; font-weight: 700; text-shadow: 0 0 12px var(--blue-soft); }
+    .visor { position: relative; flex: 1; min-height: 440px; overflow: hidden; border: 1px solid var(--line); border-radius: 18px; background: radial-gradient(ellipse at center, #102c42 0%, #071525 54%, #030812 100%); box-shadow: inset 0 0 18px rgba(57,201,255,.07), 0 0 10px rgba(57,201,255,.05); isolation: isolate; }
+    #cameraFeed { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #02060c; display: none; z-index: 0; }
+    .camera-placeholder { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 28px; color: rgba(180,225,245,.62); z-index: 0; background: repeating-linear-gradient(0deg, transparent 0 34px, rgba(57,201,255,.035) 35px 36px), repeating-linear-gradient(90deg, transparent 0 34px, rgba(57,201,255,.035) 35px 36px); }
+    .camera-placeholder strong { display: block; color: var(--blue); letter-spacing: .18em; font-size: 13px; margin-bottom: 8px; }
+    .hud { position: absolute; inset: 0; z-index: 2; pointer-events: none; transition: opacity .2s ease; }
+    .hud.hidden { opacity: 0; }
+    .hud::before { content: ""; position: absolute; inset: 12px; border: 1px solid rgba(57,201,255,.24); border-radius: 12px; }
+    .hud::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent 49.8%, rgba(57,201,255,.11) 50%, transparent 50.2%), linear-gradient(0deg, transparent 49.8%, rgba(57,201,255,.11) 50%, transparent 50.2%); opacity: .45; }
+    .hud-top, .hud-bottom { position: absolute; left: 22px; right: 22px; display: flex; justify-content: space-between; gap: 12px; z-index: 3; }
+    .hud-top { top: 22px; align-items: flex-start; }
+    .hud-bottom { bottom: 22px; align-items: flex-end; }
+    .readout { background: var(--panel); border-left: 2px solid var(--blue); padding: 7px 9px; min-width: 100px;  }
+    .readout.red { border-left-color: var(--red); text-align: right; }
+    .readout .label { color: var(--muted); font-size: 9px; letter-spacing: .15em; }
+    .readout .value { color: var(--text); font-size: 12px; font-weight: 700; margin-top: 3px; }
+    .reticle { position: absolute; z-index: 3; left: 50%; top: 50%; width: 82px; height: 82px; transform: translate(-50%,-50%); border: 1px solid rgba(57,201,255,.6); border-radius: 50%; box-shadow: 0 0 8px rgba(57,201,255,.12); }
+    .reticle::before, .reticle::after { content: ""; position: absolute; background: var(--red); box-shadow: 0 0 8px rgba(255,70,93,.7); }
+    .reticle::before { width: 24px; height: 1px; left: 28px; top: 40px; }
+    .reticle::after { width: 1px; height: 24px; left: 40px; top: 28px; }
+    .corner { position: absolute; z-index: 3; width: 22px; height: 22px; border-color: var(--red); border-style: solid; opacity: .9; }
+    .c1 { top: 17%; left: 7%; border-width: 2px 0 0 2px; }
+    .c2 { top: 17%; right: 7%; border-width: 2px 2px 0 0; }
+    .c3 { bottom: 17%; left: 7%; border-width: 0 0 2px 2px; }
+    .c4 { bottom: 17%; right: 7%; border-width: 0 2px 2px 0; }
+    .karen { position: absolute; z-index: 4; right: 22px; top: 50%; transform: translateY(-50%); width: 46px; height: 46px; border: 1px solid var(--red); border-radius: 50%; display: grid; place-items: center; color: var(--red); background: rgba(8,12,23,.8); box-shadow: 0 0 15px rgba(255,70,93,.18); font-size: 21px; }
+    .subtitle { position: absolute; z-index: 5; left: 12%; right: 12%; bottom: 78px; min-height: 28px; text-align: center; color: white; background: rgba(1,7,14,.78); border: 1px solid rgba(57,201,255,.35); border-radius: 8px; padding: 6px 10px; font-size: 12px; display: none; }
+    .subtitle.show { display: block; }
+    .statusline { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 10px; letter-spacing: .08em; }
+    .dot { display: inline-block; width: 7px; height: 7px; margin-right: 6px; border-radius: 50%; background: #62efb0; box-shadow: 0 0 8px #62efb0; }
+    .controls { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .controls button, .map-link { min-height: 43px; border: 1px solid rgba(57,201,255,.5); border-radius: 10px; background: linear-gradient(180deg, rgba(11,37,56,.95), rgba(5,17,30,.95)); color: var(--text); font-size: 11px; font-weight: 700; letter-spacing: .06em; cursor: pointer; text-decoration: none; display: flex; align-items: center; justify-content: center; padding: 8px; }
+    .controls button:active, .map-link:active { border-color: var(--red); transform: scale(.98); }
+    .controls button.primary { border-color: var(--red); color: #fff; }
+    .controls button:disabled { opacity: .45; }
+    .karen-panel { border: 1px solid rgba(255,70,93,.38); background: rgba(20,8,18,.55); border-radius: 12px; padding: 9px 11px; display: flex; align-items: center; gap: 10px; }
+    .karen-tag { color: var(--red); font-size: 10px; font-weight: 900; letter-spacing: .16em; white-space: nowrap; }
+    #karenText { color: #d7eaf4; font-size: 12px; line-height: 1.35; }
+    #mapLink { display: none; }
+    .command-hint { color: #83a9bc; font-size: 10px; line-height: 1.45; text-align: center; padding: 2px 8px; }
+    .foot { text-align: center; color: #557488; font-size: 9px; letter-spacing: .08em; }
+
+    /* Modo visor inmersivo: las animaciones solo se activan en pantalla completa. */
+    .visor.fullscreen-mode {
+      position: fixed; inset: 0; z-index: 9999; width: 100vw; height: 100vh; height: 100dvh;
+      min-height: 0; border: 0; border-radius: 0; background: #020812;
+      padding: 0; box-shadow: none;
+    }
+    .visor.fullscreen-mode #cameraFeed { object-fit: cover; }
+    .visor.fullscreen-mode .hud::before { inset: 3.5%; border: 1px solid rgba(57,201,255,.42); border-radius: 3px; }
+    .visor.fullscreen-mode .hud::after {
+      opacity: .58;
+      background: linear-gradient(90deg, transparent 49.85%, rgba(57,201,255,.22) 50%, transparent 50.15%),
+                  linear-gradient(0deg, transparent 49.85%, rgba(57,201,255,.16) 50%, transparent 50.15%);
+    }
+    .visor.fullscreen-mode .readout { background: rgba(2,12,25,.72); backdrop-filter: blur(3px); border-left-width: 2px; }
+    .visor.fullscreen-mode .hud-top { top: max(24px, env(safe-area-inset-top)); left: 5%; right: 5%; }
+    .visor.fullscreen-mode .hud-bottom { bottom: max(28px, env(safe-area-inset-bottom)); left: 5%; right: 5%; }
+    .visor.fullscreen-mode .reticle { width: 112px; height: 112px; border-color: rgba(57,201,255,.82); animation: reticlePulse 3.2s ease-in-out infinite; }
+    .visor.fullscreen-mode .reticle::before { left: 43px; top: 55px; width: 24px; }
+    .visor.fullscreen-mode .reticle::after { left: 55px; top: 43px; height: 24px; }
+    .visor.fullscreen-mode .corner { width: 34px; height: 34px; animation: cornerGlow 2.8s ease-in-out infinite alternate; }
+    .visor.fullscreen-mode .c1 { top: 8%; left: 5%; }
+    .visor.fullscreen-mode .c2 { top: 8%; right: 5%; }
+    .visor.fullscreen-mode .c3 { bottom: 8%; left: 5%; }
+    .visor.fullscreen-mode .c4 { bottom: 8%; right: 5%; }
+    .visor.fullscreen-mode .karen { top: 50%; right: 5%; width: 54px; height: 54px; animation: karenPulse 2.4s ease-in-out infinite; }
+    .visor.fullscreen-mode .subtitle { bottom: max(100px, 13vh); font-size: 14px; background: rgba(1,7,14,.84); }
+    .visor.fullscreen-mode .hud::before { animation: frameGlow 4s ease-in-out infinite; }
+    .visor.fullscreen-mode .hud::after { animation: crosshairGlow 5s linear infinite; }
+    .visor.fullscreen-mode .hud-sweep { display: block; }
+    .hud-sweep { display: none; position: absolute; z-index: 1; left: 4%; right: 4%; top: 0; height: 2px; pointer-events: none;
+      background: linear-gradient(90deg, transparent, rgba(57,201,255,.9), rgba(255,70,93,.65), transparent);
+      box-shadow: 0 0 12px rgba(57,201,255,.55); animation: sweepDown 6s linear infinite; opacity: .72; }
+    .visor.fullscreen-mode .fullscreen-exit { display: flex; }
+    .fullscreen-exit { display: none; position: absolute; z-index: 8; top: max(14px, env(safe-area-inset-top)); right: 14px;
+      border: 1px solid rgba(255,70,93,.7); color: white; background: rgba(4,12,24,.82); border-radius: 8px;
+      padding: 9px 12px; font-size: 11px; font-weight: 800; letter-spacing: .08em; }
+    @keyframes sweepDown { 0% { transform: translateY(0); opacity: 0; } 8% { opacity: .8; } 92% { opacity: .55; } 100% { transform: translateY(92vh); opacity: 0; } }
+    @keyframes reticlePulse { 0%,100% { transform: translate(-50%,-50%) scale(1); box-shadow: 0 0 9px rgba(57,201,255,.18); } 50% { transform: translate(-50%,-50%) scale(1.07); box-shadow: 0 0 22px rgba(57,201,255,.4); } }
+    @keyframes cornerGlow { from { opacity: .55; filter: drop-shadow(0 0 1px var(--red)); } to { opacity: 1; filter: drop-shadow(0 0 7px var(--red)); } }
+    @keyframes karenPulse { 0%,100% { box-shadow: 0 0 9px rgba(255,70,93,.2); } 50% { box-shadow: 0 0 22px rgba(255,70,93,.58); } }
+    @keyframes frameGlow { 0%,100% { border-color: rgba(57,201,255,.24); } 50% { border-color: rgba(57,201,255,.65); } }
+    @keyframes crosshairGlow { 0%,100% { opacity: .25; } 50% { opacity: .7; } }
+    body.immersive-open { overflow: hidden; }
+    @media (orientation: portrait) { .visor.fullscreen-mode .hud-top { top: max(48px, env(safe-area-inset-top)); } }
+
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+    @media (min-width: 700px) { .app { max-width: 760px; margin: auto; } .visor { min-height: 560px; } }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div><div class="brand">SPIDER SYSTEM</div><div class="version">PROTOTIPO 0.5 · FULLSCREEN HUD</div></div>
+      <div id="clock" class="clock">--:--:--</div>
+    </header>
+
+    <section class="visor" aria-label="Visor de cámara con interfaz HUD">
+      <video id="cameraFeed" autoplay playsinline muted></video>
+      <div class="hud-sweep" aria-hidden="true"></div>
+      <button class="fullscreen-exit" id="fullscreenExit" type="button">SALIR ✕</button>
+      <div id="cameraPlaceholder" class="camera-placeholder"><div><strong>VISOR EN ESPERA</strong>Activá CÁMARA para mostrar la imagen<br>con la interfaz HUD superpuesta.</div></div>
+      <div id="hud" class="hud">
+        <div class="hud-top">
+          <div class="readout"><div class="label">SISTEMA</div><div class="value" id="systemState">EN ESPERA</div></div>
+          <div class="readout red"><div class="label">MODO</div><div class="value">HOMECOMING</div></div>
+        </div>
+        <div class="reticle"></div>
+        <i class="corner c1"></i><i class="corner c2"></i><i class="corner c3"></i><i class="corner c4"></i>
+        <div class="karen" aria-label="KAREN">✳</div>
+        <div class="hud-bottom">
+          <div class="readout"><div class="label">UBICACIÓN</div><div class="value" id="locationState">SIN DATOS</div></div>
+          <div class="readout red"><div class="label">CÁMARA</div><div class="value" id="cameraState">OFFLINE</div></div>
+        </div>
+        <div id="subtitle" class="subtitle"></div>
+      </div>
+    </section>
+
+    <div class="statusline"><span><i class="dot"></i><span id="statusText">SISTEMA LISTO</span></span><span>ANDROID 11 · DEMO WEB</span></div>
+
+    <nav class="controls" aria-label="Controles principales">
+      <button class="primary" id="cameraBtn">▣ CÁMARA</button>
+      <button id="fullscreenBtn">⛶ PANTALLA COMPLETA</button>
+      <button id="voiceBtn">◉ VOZ</button>
+      <button id="gpsBtn">⌖ GPS</button>
+      <button id="subtitleBtn">CC SUBTÍTULOS</button>
+      <button id="diagnosticBtn">◇ DIAGNÓSTICO</button>
+      <a class="map-link" id="mapLink" target="_blank" rel="noopener">ABRIR GOOGLE MAPS</a>
+    </nav>
+
+    <section class="karen-panel"><div class="karen-tag">KAREN</div><div id="karenText">Sistemas preparados. Esperando tus órdenes, Peter.</div></section>
+    <div class="command-hint">PRUEBA: “KAREN, activa cámara” · “abre GPS” · “qué hora es” · “estado del sistema” · “activa subtítulos” · “silencio”</div>
+    <div class="foot">PROTOTIPO 0.5 · HUD INMERSIVO · IA REAL Y RECONOCIMIENTO FACIAL NO IMPLEMENTADOS</div>
+  </main>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const video = $('cameraFeed');
+    let cameraStream = null;
+    let subtitlesOn = true;
+    let recognition = null;
+    let selectedVoice = null;
+    let voiceEnabled = true;
+
+    // Selecciona una voz española instalada; la disponibilidad depende de Android/navegador.
+    function chooseSpanishVoice() {
+      if (!('speechSynthesis' in window)) return;
+      const voices = window.speechSynthesis.getVoices();
+      const spanish = voices.filter(v => /^es([_-]|$)/i.test(v.lang));
+      selectedVoice = spanish.find(v => /es-ES/i.test(v.lang) && /natural|neural|google/i.test(v.name))
+        || spanish.find(v => /es-ES/i.test(v.lang))
+        || spanish.find(v => /es-MX|es-US|es-AR|es-419/i.test(v.lang))
+        || spanish[0] || null;
+    }
+    if ('speechSynthesis' in window) {
+      chooseSpanishVoice();
+      window.speechSynthesis.onvoiceschanged = chooseSpanishVoice;
+    }
+
+    function updateClock() {
+      $('clock').textContent = new Date().toLocaleTimeString('es-PY', { hour12: false });
+    }
+    updateClock();
+    setInterval(updateClock, 1000);
+
+    function say(message, speak = true) {
+      $('karenText').textContent = message;
+      if (subtitlesOn) {
+        $('subtitle').textContent = 'KAREN: ' + message;
+        $('subtitle').classList.add('show');
+      }
+      if (speak && voiceEnabled && 'speechSynthesis' in window) {
+        // Evita acumular frases y limita respuestas demasiado seguidas.
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(message);
+        utterance.voice = selectedVoice;
+        utterance.lang = selectedVoice ? selectedVoice.lang : 'es-ES';
+        utterance.rate = 0.94;
+        utterance.pitch = 1.03;
+        utterance.volume = 0.95;
+        window.speechSynthesis.speak(utterance);
+      }
+    }
+
+    async function startCamera() {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        say('Este navegador no permite acceder a la cámara desde esta página. Probá abrirla en Chrome mediante una conexión local segura.', false);
+        $('statusText').textContent = 'CÁMARA NO DISPONIBLE';
+        return;
+      }
+      try {
+        $('statusText').textContent = 'SOLICITANDO PERMISO DE CÁMARA';
+        cameraStream = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          // Resolución moderada para reducir carga y temperatura en móviles modestos.
+          video: { facingMode: { ideal: 'environment' }, width: { ideal: 960, max: 1280 }, height: { ideal: 540, max: 720 }, frameRate: { ideal: 24, max: 30 } }
+        });
+        video.srcObject = cameraStream;
+        video.style.display = 'block';
+        $('cameraPlaceholder').style.display = 'none';
+        $('cameraState').textContent = 'ONLINE';
+        $('systemState').textContent = 'VISOR ACTIVO';
+        $('statusText').textContent = 'CÁMARA ACTIVA · HUD SUPERPUESTO';
+        // El HUD permanece en una capa independiente por encima del video.
+        $('hud').classList.remove('hidden');
+        say('Cámara activa. Interfaz del visor superpuesta. Intentá no caminar mirando la pantalla.', false);
+      } catch (error) {
+        $('statusText').textContent = 'NO SE PUDO ABRIR LA CÁMARA';
+        const reason = error && error.name === 'NotAllowedError' ? 'Permiso denegado. Habilitá la cámara para esta aplicación.' :
+          error && error.name === 'NotFoundError' ? 'No encontré una cámara disponible.' :
+          'El navegador bloqueó la cámara. Revisá permisos y probá desde Chrome o Acode Preview.';
+        say(reason, false);
+      }
+    }
+
+    function stopCamera() {
+      if (document.querySelector('.visor').classList.contains('fullscreen-mode')) exitFullscreen();
+      if (cameraStream) cameraStream.getTracks().forEach(track => track.stop());
+      cameraStream = null;
+      video.srcObject = null;
+      video.style.display = 'none';
+      $('cameraPlaceholder').style.display = 'grid';
+      $('cameraState').textContent = 'OFFLINE';
+      $('systemState').textContent = 'EN ESPERA';
+      $('statusText').textContent = 'CÁMARA DESACTIVADA';
+      say('Cámara desconectada. El visor sigue disponible.', false);
+    }
+
+    $('cameraBtn').addEventListener('click', () => cameraStream ? stopCamera() : startCamera());
+
+    async function enterFullscreen() {
+      const visor = document.querySelector('.visor');
+      if (!cameraStream) {
+        say('Primero activá la cámara para abrir el visor completo.');
+        await startCamera();
+        if (!cameraStream) return;
+      }
+      try {
+        if (visor.requestFullscreen) await visor.requestFullscreen();
+        else if (visor.webkitRequestFullscreen) visor.webkitRequestFullscreen();
+        visor.classList.add('fullscreen-mode');
+        document.body.classList.add('immersive-open');
+        $('fullscreenBtn').textContent = '⛶ VISOR ABIERTO';
+        say('Modo visor inmersivo activado. Interfaz animada en línea.', false);
+      } catch (error) {
+        // Algunos WebViews no permiten Fullscreen API; se ofrece el modo inmersivo CSS.
+        visor.classList.add('fullscreen-mode');
+        document.body.classList.add('immersive-open');
+        $('fullscreenBtn').textContent = '⛶ VISOR ABIERTO';
+        say('Modo inmersivo activado. El navegador no habilitó pantalla completa nativa.', false);
+      }
+    }
+    async function exitFullscreen() {
+      const visor = document.querySelector('.visor');
+      try {
+        if (document.fullscreenElement && document.exitFullscreen) await document.exitFullscreen();
+        else if (document.webkitFullscreenElement && document.webkitExitFullscreen) document.webkitExitFullscreen();
+      } catch (e) {}
+      visor.classList.remove('fullscreen-mode');
+      document.body.classList.remove('immersive-open');
+      $('fullscreenBtn').textContent = '⛶ PANTALLA COMPLETA';
+    }
+    $('fullscreenBtn').addEventListener('click', enterFullscreen);
+    $('fullscreenExit').addEventListener('click', exitFullscreen);
+    document.addEventListener('fullscreenchange', () => {
+      if (!document.fullscreenElement) {
+        document.querySelector('.visor').classList.remove('fullscreen-mode');
+        document.body.classList.remove('immersive-open');
+        $('fullscreenBtn').textContent = '⛶ PANTALLA COMPLETA';
+      }
+    });
+
+
+    function toggleSubtitles() {
+      subtitlesOn = !subtitlesOn;
+      $('subtitleBtn').textContent = subtitlesOn ? 'CC SUBTÍTULOS: ON' : 'CC SUBTÍTULOS: OFF';
+      $('subtitle').classList.toggle('show', subtitlesOn && $('subtitle').textContent.length > 0);
+      say(subtitlesOn ? 'Subtítulos activados.' : 'Subtítulos desactivados.', false);
+    }
+    $('subtitleBtn').addEventListener('click', toggleSubtitles);
+
+    function getLocation() {
+      if (!navigator.geolocation) {
+        say('Este navegador no ofrece GPS.', false);
+        return;
+      }
+      $('statusText').textContent = 'CONSULTANDO UBICACIÓN';
+      navigator.geolocation.getCurrentPosition(position => {
+        const lat = position.coords.latitude;
+        const lon = position.coords.longitude;
+        $('locationState').textContent = lat.toFixed(3) + ', ' + lon.toFixed(3);
+        $('mapLink').href = 'https://www.google.com/maps?q=' + encodeURIComponent(lat + ',' + lon);
+        $('mapLink').style.display = 'flex';
+        $('statusText').textContent = 'UBICACIÓN OBTENIDA';
+        say('Ubicación obtenida. Google Maps está listo.', false);
+      }, error => {
+        $('statusText').textContent = 'GPS SIN ACCESO';
+        say(error.code === 1 ? 'Permiso de ubicación denegado.' : 'No pude obtener la ubicación. Revisá el GPS e intentá otra vez.', false);
+      }, { enableHighAccuracy: true, timeout: 12000, maximumAge: 10000 });
+    }
+    $('gpsBtn').addEventListener('click', getLocation);
+
+    function runDiagnostic() {
+      const camera = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+      const gps = !!navigator.geolocation;
+      const voice = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+      say('Diagnóstico terminado. Cámara: ' + (camera ? 'compatible' : 'no disponible') + '. GPS: ' + (gps ? 'disponible' : 'no disponible') + '. Voz: ' + (voice ? 'compatible' : 'no compatible') + '. La IA real todavía no está conectada.', false);
+      $('statusText').textContent = 'DIAGNÓSTICO COMPLETADO';
+    }
+    $('diagnosticBtn').addEventListener('click', runDiagnostic);
+
+    function normalizeCommand(value) {
+      return value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[¿?¡!,.;:]/g, ' ').replace(/\s+/g, ' ').trim();
+    }
+
+    function processCommand(raw) {
+      const command = normalizeCommand(raw).replace(/^karen[ ,]*/, '').replace(/^oye karen[ ,]*/, '');
+      $('statusText').textContent = 'COMANDO: ' + command.toUpperCase().slice(0, 32);
+
+      if (/^(hola|buenos dias|buenas tardes|buenas noches)$/.test(command)) {
+        say('Hola, Peter. Estoy en línea. ¿Qué necesitas?');
+      } else if (/(activa|enciende|abre|inicia|muestra).*(camara|visor)|(camara|visor).*(activa|enciende|abre)/.test(command)) {
+        if (!cameraStream) startCamera(); else say('La cámara ya está activa.');
+      } else if (/(apaga|desactiva|cierra|deten).*(camara|visor)|(camara|visor).*(apaga|desactiva)/.test(command)) {
+        if (cameraStream) stopCamera(); else say('La cámara ya está apagada.');
+      } else if (/(gps|ubicacion|mapa|google maps)/.test(command)) {
+        getLocation();
+      } else if (/(activa|enciende|muestra).*(subtitulo|subtitulos)/.test(command)) {
+        if (!subtitlesOn) toggleSubtitles();
+        say('Subtítulos activados.');
+      } else if (/(apaga|desactiva|oculta).*(subtitulo|subtitulos)/.test(command)) {
+        if (subtitlesOn) toggleSubtitles();
+        say('Subtítulos desactivados.', false);
+      } else if (/(diagnostico|estado del sistema|como estas los sistemas|revisa el sistema)/.test(command)) {
+        runDiagnostic();
+      } else if (/(que hora|dime la hora|hora actual)/.test(command)) {
+        say('Son las ' + $('clock').textContent + '.');
+      } else if (/(silencio|callate|no hables|silencia voz)/.test(command)) {
+        voiceEnabled = false;
+        window.speechSynthesis && window.speechSynthesis.cancel();
+        say('Modo silencioso activado. Los subtítulos siguen disponibles.', false);
+      } else if (/(activa voz|enciende voz|vuelve a hablar)/.test(command)) {
+        voiceEnabled = true;
+        say('Voz activada. Estoy lista.');
+      } else if (/(ayuda|que comandos|comandos disponibles)/.test(command)) {
+        say('Puedo activar o apagar la cámara, abrir el GPS, activar subtítulos, hacer un diagnóstico, decir la hora y activar o silenciar mi voz.');
+      } else {
+        say('No reconocí esa orden. Decí ayuda para escuchar los comandos disponibles.', false);
+      }
+    }
+
+    function startVoice() {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        say('El reconocimiento de voz no está disponible en este navegador. Probá Chrome actualizado.', false);
+        return;
+      }
+      if (recognition) { recognition.stop(); recognition = null; }
+      recognition = new SpeechRecognition();
+      recognition.lang = 'es-PY';
+      recognition.interimResults = false;
+      recognition.continuous = false;
+      recognition.maxAlternatives = 1;
+      recognition.onstart = () => { $('statusText').textContent = 'ESCUCHANDO COMANDO'; $('voiceBtn').textContent = '◉ ESCUCHANDO'; };
+      recognition.onresult = event => processCommand(event.results[0][0].transcript);
+      recognition.onerror = event => { $('statusText').textContent = 'VOZ INTERRUMPIDA'; if (event.error === 'not-allowed') say('Necesito permiso para usar el micrófono.', false); };
+      recognition.onend = () => { $('voiceBtn').textContent = '◉ VOZ'; recognition = null; };
+      try { recognition.start(); } catch (e) { say('No pude iniciar el micrófono. Revisá sus permisos.', false); }
+    }
+    $('voiceBtn').addEventListener('click', startVoice);
+
+    window.addEventListener('pagehide', () => {
+      if (cameraStream) cameraStream.getTracks().forEach(track => track.stop());
+      if (recognition) recognition.stop();
+      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+    });
+  </script>
+</body>
+</html>
